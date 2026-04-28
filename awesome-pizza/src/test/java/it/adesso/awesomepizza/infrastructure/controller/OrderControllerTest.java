@@ -1,0 +1,73 @@
+package it.adesso.awesomepizza.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import it.adesso.awesomepizza.constant.ApiPaths;
+import it.adesso.awesomepizza.exception.GlobalExceptionHandler;
+import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.OrderStatus;
+import it.adesso.awesomepizza.model.PizzaDTO;
+import it.adesso.awesomepizza.service.OrderServiceInterface;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class OrderControllerTest {
+
+    private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final OrderServiceInterface orderService = mock(OrderServiceInterface.class);
+
+    @BeforeEach
+    void setUp() {
+        OrderController controller = new OrderController(orderService);
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+    }
+
+    @Test
+    void shouldCreateOrder() throws Exception {
+        OrderDTO request = OrderDTO.builder()
+                .pizzas(List.of(PizzaDTO.builder().name("Margherita").quantity(2).build()))
+                .build();
+
+        OrderDTO response = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.RECEIVED)
+                .pizzas(request.getPizzas())
+                .build();
+
+        when(orderService.createOrder(any(OrderDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post(ApiPaths.ORDERS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("ABC12345"))
+                .andExpect(jsonPath("$.status").value("RECEIVED"));
+    }
+
+    @Test
+    void shouldRejectInvalidOrderPayload() throws Exception {
+        OrderDTO request = OrderDTO.builder().build();
+
+        mockMvc.perform(post(ApiPaths.ORDERS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+}
