@@ -37,3 +37,11 @@ awesome-pizza:
 
 server:
   port: 8080
+
+springdoc:
+  api-docs:
+    path: /api/docs
+  swagger-ui:
+    path: /swagger
+    tags-sorter: alpha
+    operations-sorter: alpha
