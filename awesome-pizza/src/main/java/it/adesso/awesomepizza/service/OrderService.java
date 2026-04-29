@@ -38,7 +38,8 @@ public class OrderService implements OrderServiceInterface {
      */
     @Override
     public OrderDTO createOrder(OrderDTO orderDTO) {
-        log.info("Creating new order with {} pizzas", orderDTO.getPizzas().size());
+        int pizzasCount = orderDTO != null && orderDTO.getPizzas() != null ? orderDTO.getPizzas().size() : 0;
+        OrderLogUtils.logBusinessEvent(log, "order.create.requested", null, null, OrderStatus.RECEIVED, "pizzasCount=" + pizzasCount);
         validateOrderRequest(orderDTO);
 
         Order order = Order.builder()
@@ -55,7 +56,7 @@ public class OrderService implements OrderServiceInterface {
         order.getPizzas().forEach(pizza -> pizza.setOrder(order));
 
         Order savedOrder = orderRepository.save(order);
-        OrderLogUtils.logOrderCreated(log, savedOrder.getCode(), savedOrder.getPizzas().size());
+        OrderLogUtils.logOrderCreated(log, savedOrder.getId(), savedOrder.getCode(), savedOrder.getStatus(), savedOrder.getPizzas().size());
 
         return orderMapper.toDTO(savedOrder);
     }
@@ -66,7 +67,7 @@ public class OrderService implements OrderServiceInterface {
     @Transactional(readOnly = true)
     @Override
     public OrderDTO getOrderByCode(String code) {
-        log.info("Retrieving order by code: {}", code);
+        OrderLogUtils.logBusinessEvent(log, "order.get-by-code.requested", null, code, null, "");
 
         Order order = orderRepository.findByCode(code)
                 .orElseThrow(() -> {
@@ -83,7 +84,7 @@ public class OrderService implements OrderServiceInterface {
     @Transactional(readOnly = true)
     @Override
     public OrderDTO getOrderById(Long id) {
-        log.info("Retrieving order by id: {}", id);
+        OrderLogUtils.logBusinessEvent(log, "order.get-by-id.requested", id, null, null, "");
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> {
@@ -100,7 +101,7 @@ public class OrderService implements OrderServiceInterface {
     @Transactional(readOnly = true)
     @Override
     public List<OrderDTO> getAllOrders() {
-        log.info("Retrieving all orders");
+        OrderLogUtils.logBusinessEvent(log, "order.get-all.requested", null, null, null, "");
 
         List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
         return orders.stream()
@@ -114,7 +115,7 @@ public class OrderService implements OrderServiceInterface {
     @Transactional(readOnly = true)
     @Override
     public List<OrderDTO> getOrderQueue() {
-        log.info("Retrieving order queue");
+        OrderLogUtils.logBusinessEvent(log, "order.queue.requested", null, null, OrderStatus.RECEIVED, "");
 
         List<Order> queueOrders = orderRepository.findByStatusOrderByCreatedAtAsc(OrderStatus.RECEIVED);
         return queueOrders.stream()
@@ -127,7 +128,7 @@ public class OrderService implements OrderServiceInterface {
      */
     @Override
     public OrderDTO startOrder(Long id) {
-        log.info("Starting order with id: {}", id);
+        OrderLogUtils.logBusinessEvent(log, "order.start.requested", id, null, OrderStatus.RECEIVED, "");
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> {
@@ -143,7 +144,7 @@ public class OrderService implements OrderServiceInterface {
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.IN_PROGRESS);
         Order updatedOrder = orderRepository.save(order);
-        OrderLogUtils.logStatusTransition(log, id, previousStatus, updatedOrder.getStatus());
+        OrderLogUtils.logStatusTransition(log, updatedOrder.getId(), updatedOrder.getCode(), previousStatus, updatedOrder.getStatus());
 
         return orderMapper.toDTO(updatedOrder);
     }
@@ -153,7 +154,7 @@ public class OrderService implements OrderServiceInterface {
      */
     @Override
     public OrderDTO markAsReady(Long id) {
-        log.info("Marking order with id: {} as ready", id);
+        OrderLogUtils.logBusinessEvent(log, "order.ready.requested", id, null, OrderStatus.IN_PROGRESS, "");
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> {
@@ -169,7 +170,7 @@ public class OrderService implements OrderServiceInterface {
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.READY);
         Order updatedOrder = orderRepository.save(order);
-        OrderLogUtils.logStatusTransition(log, id, previousStatus, updatedOrder.getStatus());
+        OrderLogUtils.logStatusTransition(log, updatedOrder.getId(), updatedOrder.getCode(), previousStatus, updatedOrder.getStatus());
 
         return orderMapper.toDTO(updatedOrder);
     }
@@ -179,7 +180,7 @@ public class OrderService implements OrderServiceInterface {
      */
     @Override
     public OrderDTO completeOrder(Long id) {
-        log.info("Completing order with id: {}", id);
+        OrderLogUtils.logBusinessEvent(log, "order.complete.requested", id, null, OrderStatus.READY, "");
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> {
@@ -195,7 +196,7 @@ public class OrderService implements OrderServiceInterface {
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.COMPLETED);
         Order updatedOrder = orderRepository.save(order);
-        OrderLogUtils.logStatusTransition(log, id, previousStatus, updatedOrder.getStatus());
+        OrderLogUtils.logStatusTransition(log, updatedOrder.getId(), updatedOrder.getCode(), previousStatus, updatedOrder.getStatus());
 
         return orderMapper.toDTO(updatedOrder);
     }
