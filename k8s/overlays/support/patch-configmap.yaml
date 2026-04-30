@@ -4,3 +4,5 @@ metadata:
   name: awesome-pizza-config
 data:
   SPRING_PROFILES_ACTIVE: support
+  AWESOME_PIZZA_MAX_PIZZAS_PER_ORDER: "15"
+  AWESOME_PIZZA_MAX_QUANTITY_PER_PIZZA: "25"
