@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awesome-pizza-config
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  AWESOME_PIZZA_MAX_PIZZAS_PER_ORDER: "20"
+  AWESOME_PIZZA_MAX_QUANTITY_PER_PIZZA: "30"
