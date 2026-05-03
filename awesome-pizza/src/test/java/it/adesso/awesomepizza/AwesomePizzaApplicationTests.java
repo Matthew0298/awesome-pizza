@@ -1,4 +1,4 @@
-package it.adesso.awesome_pizza;
+package it.adesso.awesomepizza;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
