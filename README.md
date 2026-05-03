@@ -5,7 +5,7 @@ Backend REST per la gestione ordini di una pizzeria, sviluppato con Spring Boot.
 ## Stack Tecnologico
 
 - Java 17+
-- Spring Boot 4
+- Spring Boot 3.2.0
 - Spring Web
 - Spring Data JPA
 - Jakarta Validation
