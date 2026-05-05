@@ -1,7 +1,10 @@
 package it.adesso.awesomepizza.controller;
 
 import it.adesso.awesomepizza.controller.api.OrderApi;
+import it.adesso.awesomepizza.exception.ForbiddenOperationException;
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.UpdateOrderPriorityRequest;
 import it.adesso.awesomepizza.service.OrderServiceInterface;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -24,9 +27,9 @@ public class OrderController implements OrderApi {
      * POST /orders - Create a new order
      */
     @Override
-    public ResponseEntity<OrderDTO> createOrder(OrderDTO orderDTO) {
+    public ResponseEntity<OrderDTO> createOrder(CreateOrderRequest request) {
         log.info("Request to create new order");
-        OrderDTO createdOrder = orderService.createOrder(orderDTO);
+        OrderDTO createdOrder = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
     }
 
@@ -98,6 +101,19 @@ public class OrderController implements OrderApi {
         log.info("Request to cancel order with id: {}", id);
         OrderDTO cancelledOrder = orderService.cancelOrder(id);
         return ResponseEntity.ok(cancelledOrder);
+    }
+
+    /**
+     * PUT /orders/{id}/priority - Update order priority (admin only via header)
+     */
+    @Override
+    public ResponseEntity<OrderDTO> updatePriority(Long id, UpdateOrderPriorityRequest request, String userRole) {
+        if (userRole == null || !userRole.equalsIgnoreCase("ADMIN")) {
+            throw new ForbiddenOperationException("Only ADMIN can update order priority");
+        }
+        log.info("Request to update priority for order id: {} with role: {}", id, userRole);
+        OrderDTO updatedOrder = orderService.updatePriority(id, request.getPriority());
+        return ResponseEntity.ok(updatedOrder);
     }
 }
 

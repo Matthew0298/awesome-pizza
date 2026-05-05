@@ -36,6 +36,10 @@ public class Order {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrderPriority priority;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     private List<Pizza> pizzas = new ArrayList<>();
 
@@ -64,6 +68,9 @@ public class Order {
         }
         if (status == null) {
             status = OrderStatus.RECEIVED;
+        }
+        if (priority == null) {
+            priority = OrderPriority.NORMAL;
         }
         if (createdBy == null) {
             createdBy = "system";

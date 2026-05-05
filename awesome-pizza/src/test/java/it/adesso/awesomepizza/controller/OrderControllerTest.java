@@ -5,9 +5,12 @@ import it.adesso.awesomepizza.constant.ApiPaths;
 import it.adesso.awesomepizza.exception.GlobalExceptionHandler;
 import it.adesso.awesomepizza.exception.InvalidOrderStateException;
 import it.adesso.awesomepizza.exception.OrderNotFoundException;
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.OrderPriority;
 import it.adesso.awesomepizza.model.OrderStatus;
 import it.adesso.awesomepizza.model.PizzaDTO;
+import it.adesso.awesomepizza.model.UpdateOrderPriorityRequest;
 import it.adesso.awesomepizza.service.OrderServiceInterface;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +46,7 @@ class OrderControllerTest {
 
     @Test
     void shouldCreateOrder() throws Exception {
-        OrderDTO request = OrderDTO.builder()
+        CreateOrderRequest request = CreateOrderRequest.builder()
                 .pizzas(List.of(PizzaDTO.builder().name("Margherita").quantity(2).build()))
                 .build();
 
@@ -50,10 +54,11 @@ class OrderControllerTest {
                 .id(1L)
                 .code("ABC12345")
                 .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.NORMAL)
                 .pizzas(request.getPizzas())
                 .build();
 
-        when(orderService.createOrder(any(OrderDTO.class))).thenReturn(response);
+        when(orderService.createOrder(any(CreateOrderRequest.class))).thenReturn(response);
 
         mockMvc.perform(post(ApiPaths.ORDERS)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -65,7 +70,7 @@ class OrderControllerTest {
 
     @Test
     void shouldRejectInvalidOrderPayload() throws Exception {
-        OrderDTO request = OrderDTO.builder().build();
+        CreateOrderRequest request = CreateOrderRequest.builder().build();
 
         mockMvc.perform(post(ApiPaths.ORDERS)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -80,6 +85,7 @@ class OrderControllerTest {
                 .id(1L)
                 .code("ABC12345")
                 .status(OrderStatus.CANCELLED)
+                .priority(OrderPriority.NORMAL)
                 .build();
 
         when(orderService.cancelOrder(1L)).thenReturn(response);
@@ -107,5 +113,41 @@ class OrderControllerTest {
         mockMvc.perform(put(ApiPaths.ORDERS + "/999/cancel"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Order not found with id: 999"));
+    }
+
+    @Test
+    void shouldUpdatePriorityWhenAdmin() throws Exception {
+        UpdateOrderPriorityRequest request = UpdateOrderPriorityRequest.builder()
+                .priority(OrderPriority.HIGH)
+                .build();
+        OrderDTO response = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.HIGH)
+                .build();
+
+        when(orderService.updatePriority(eq(1L), eq(OrderPriority.HIGH))).thenReturn(response);
+
+        mockMvc.perform(put(ApiPaths.ORDERS + "/1/priority")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("HIGH"));
+    }
+
+    @Test
+    void shouldRejectPriorityUpdateWhenNotAdmin() throws Exception {
+        UpdateOrderPriorityRequest request = UpdateOrderPriorityRequest.builder()
+                .priority(OrderPriority.HIGH)
+                .build();
+
+        mockMvc.perform(put(ApiPaths.ORDERS + "/1/priority")
+                        .header("X-User-Role", "STAFF")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Only ADMIN can update order priority"));
     }
 }

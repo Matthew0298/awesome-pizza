@@ -3,7 +3,9 @@ package it.adesso.awesomepizza.controller.api;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import it.adesso.awesomepizza.constant.ApiPaths;
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.UpdateOrderPriorityRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,8 +17,8 @@ import java.util.List;
 public interface OrderApi {
 
     @PostMapping
-    @Operation(summary = "Create order", description = "Creates a new order with one or more pizzas")
-    ResponseEntity<OrderDTO> createOrder(@Valid @RequestBody OrderDTO orderDTO);
+    @Operation(summary = "Create order", description = "Creates a new order with one or more pizzas (body: pizzas only)")
+    ResponseEntity<OrderDTO> createOrder(@Valid @RequestBody CreateOrderRequest request);
 
     @GetMapping("/{code}")
     @Operation(summary = "Get order by code", description = "Retrieves a single order using its public code")
@@ -45,4 +47,12 @@ public interface OrderApi {
     @PutMapping("/{id}/cancel")
     @Operation(summary = "Cancel order", description = "Cancels the order when it is RECEIVED or IN_PROGRESS; idempotent when already CANCELLED")
     ResponseEntity<OrderDTO> cancelOrder(@PathVariable Long id);
+
+    @PutMapping("/{id}/priority")
+    @Operation(summary = "Update order priority", description = "Updates order priority. Requires X-User-Role header set to ADMIN.")
+    ResponseEntity<OrderDTO> updatePriority(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateOrderPriorityRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    );
 }

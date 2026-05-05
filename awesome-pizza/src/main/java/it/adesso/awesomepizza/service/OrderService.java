@@ -3,8 +3,10 @@ package it.adesso.awesomepizza.service;
 import it.adesso.awesomepizza.configuration.AwesomePizzaProperties;
 import it.adesso.awesomepizza.exception.InvalidOrderStateException;
 import it.adesso.awesomepizza.exception.OrderNotFoundException;
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.Order;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.OrderPriority;
 import it.adesso.awesomepizza.model.OrderStatus;
 import it.adesso.awesomepizza.model.Pizza;
 import it.adesso.awesomepizza.repo.OrderRepository;
@@ -15,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,14 +41,15 @@ public class OrderService implements OrderServiceInterface {
      * Create a new order with the given pizzas
      */
     @Override
-    public OrderDTO createOrder(OrderDTO orderDTO) {
-        int pizzasCount = orderDTO != null && orderDTO.getPizzas() != null ? orderDTO.getPizzas().size() : 0;
+    public OrderDTO createOrder(CreateOrderRequest request) {
+        int pizzasCount = request != null && request.getPizzas() != null ? request.getPizzas().size() : 0;
         OrderLogUtils.logBusinessEvent(log, "order.create.requested", null, null, OrderStatus.RECEIVED, "pizzasCount=" + pizzasCount);
-        validateOrderRequest(orderDTO);
+        validateCreateOrderRequest(request);
 
         Order order = Order.builder()
                 .status(OrderStatus.RECEIVED)
-                .pizzas(orderDTO.getPizzas().stream()
+                .priority(OrderPriority.NORMAL)
+                .pizzas(request.getPizzas().stream()
                         .map(pizzaDTO -> Pizza.builder()
                                 .name(pizzaDTO.getName())
                                 .quantity(pizzaDTO.getQuantity())
@@ -117,7 +122,11 @@ public class OrderService implements OrderServiceInterface {
     public List<OrderDTO> getOrderQueue() {
         OrderLogUtils.logBusinessEvent(log, "order.queue.requested", null, null, OrderStatus.RECEIVED, "");
 
-        List<Order> queueOrders = orderRepository.findByStatusOrderByCreatedAtAsc(OrderStatus.RECEIVED);
+        List<Order> queueOrders = new ArrayList<>(orderRepository.findByStatusOrderByCreatedAtAsc(OrderStatus.RECEIVED));
+        queueOrders.sort(
+                Comparator.comparingInt((Order order) -> priorityRank(order.getPriority())).reversed()
+                        .thenComparing(Order::getCreatedAt)
+        );
         return queueOrders.stream()
                 .map(orderMapper::toDTO)
                 .collect(Collectors.toList());
@@ -232,16 +241,43 @@ public class OrderService implements OrderServiceInterface {
         return orderMapper.toDTO(updatedOrder);
     }
 
-    private void validateOrderRequest(OrderDTO orderDTO) {
-        ValidateUtils.requireNotNull(orderDTO, "Order payload cannot be null");
-        ValidateUtils.requireNotNull(orderDTO.getPizzas(), "Order pizzas cannot be null");
-        ValidateUtils.requireTrue(!orderDTO.getPizzas().isEmpty(), "Order must contain at least one pizza");
+    @Override
+    public OrderDTO updatePriority(Long id, OrderPriority priority) {
+        OrderLogUtils.logBusinessEvent(log, "order.priority.update.requested", id, null, null, "priority=" + priority);
+        ValidateUtils.requireNotNull(priority, "Priority cannot be null");
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Order not found with id: {}", id);
+                    return new OrderNotFoundException("Order not found with id: " + id);
+                });
+
+        if (!order.getStatus().equals(OrderStatus.RECEIVED)) {
+            throw new InvalidOrderStateException("Priority can be updated only for RECEIVED orders. Current status: " + order.getStatus());
+        }
+
+        order.setPriority(priority);
+        Order updatedOrder = orderRepository.save(order);
+        return orderMapper.toDTO(updatedOrder);
+    }
+
+    private int priorityRank(OrderPriority priority) {
+        if (priority == null) {
+            return OrderPriority.NORMAL.ordinal();
+        }
+        return priority.ordinal();
+    }
+
+    private void validateCreateOrderRequest(CreateOrderRequest request) {
+        ValidateUtils.requireNotNull(request, "Order payload cannot be null");
+        ValidateUtils.requireNotNull(request.getPizzas(), "Order pizzas cannot be null");
+        ValidateUtils.requireTrue(!request.getPizzas().isEmpty(), "Order must contain at least one pizza");
         ValidateUtils.requireMax(
-                orderDTO.getPizzas().size(),
+                request.getPizzas().size(),
                 properties.maxPizzasPerOrder(),
                 "Order exceeds maximum pizzas allowed: " + properties.maxPizzasPerOrder()
         );
-        orderDTO.getPizzas().forEach(pizzaDTO -> {
+        request.getPizzas().forEach(pizzaDTO -> {
             ValidateUtils.requireNotNull(pizzaDTO, "Pizza item cannot be null");
             ValidateUtils.requireNotBlank(pizzaDTO.getName(), "Pizza name cannot be blank");
             ValidateUtils.requireNotNull(pizzaDTO.getQuantity(), "Pizza quantity cannot be null");

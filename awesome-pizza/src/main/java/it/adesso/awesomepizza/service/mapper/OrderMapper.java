@@ -21,33 +21,11 @@ public class OrderMapper {
                 .id(order.getId())
                 .code(order.getCode())
                 .status(order.getStatus())
+                .priority(order.getPriority())
                 .pizzas(toPizzaDTOs(order.getPizzas()))
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .build();
-    }
-
-    public Order toEntity(OrderDTO orderDTO) {
-        if (orderDTO == null) {
-            return null;
-        }
-
-        Order order = Order.builder()
-                .id(orderDTO.getId())
-                .code(orderDTO.getCode())
-                .status(orderDTO.getStatus())
-                .createdAt(orderDTO.getCreatedAt())
-                .updatedAt(orderDTO.getUpdatedAt())
-                .build();
-
-        // Map pizzas
-        if (orderDTO.getPizzas() != null) {
-            order.setPizzas(orderDTO.getPizzas().stream()
-                    .map(pizzaDTO -> toPizzaEntity(pizzaDTO, order))
-                    .collect(Collectors.toList()));
-        }
-
-        return order;
     }
 
     public PizzaDTO toPizzaDTO(Pizza pizza) {
@@ -59,19 +37,6 @@ public class OrderMapper {
                 .id(pizza.getId())
                 .name(pizza.getName())
                 .quantity(pizza.getQuantity())
-                .build();
-    }
-
-    public Pizza toPizzaEntity(PizzaDTO pizzaDTO, Order order) {
-        if (pizzaDTO == null) {
-            return null;
-        }
-
-        return Pizza.builder()
-                .id(pizzaDTO.getId())
-                .name(pizzaDTO.getName())
-                .quantity(pizzaDTO.getQuantity())
-                .order(order)
                 .build();
     }
 

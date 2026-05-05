@@ -3,8 +3,10 @@ package it.adesso.awesomepizza.service;
 import it.adesso.awesomepizza.configuration.AwesomePizzaProperties;
 import it.adesso.awesomepizza.exception.InvalidOrderStateException;
 import it.adesso.awesomepizza.exception.OrderNotFoundException;
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.Order;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.OrderPriority;
 import it.adesso.awesomepizza.model.OrderStatus;
 import it.adesso.awesomepizza.model.Pizza;
 import it.adesso.awesomepizza.model.PizzaDTO;
@@ -65,6 +67,7 @@ class OrderServiceTest {
                 .id(1L)
                 .code("ABC12345")
                 .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.NORMAL)
                 .pizzas(List.of(testPizzaDTO))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -74,6 +77,7 @@ class OrderServiceTest {
                 .id(1L)
                 .code("ABC12345")
                 .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.NORMAL)
                 .pizzas(new ArrayList<>(List.of(testPizza)))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -89,7 +93,11 @@ class OrderServiceTest {
         when(orderMapper.toDTO(testOrder)).thenReturn(testOrderDTO);
 
         // Act
-        OrderDTO result = orderService.createOrder(testOrderDTO);
+        CreateOrderRequest createRequest = CreateOrderRequest.builder()
+                .pizzas(testOrderDTO.getPizzas())
+                .build();
+
+        OrderDTO result = orderService.createOrder(createRequest);
 
         // Assert
         assertNotNull(result);
@@ -173,17 +181,35 @@ class OrderServiceTest {
     @Test
     void testGetOrderQueue() {
         // Arrange
-        List<Order> queueOrders = List.of(testOrder);
+        Order highPriorityOlder = Order.builder()
+                .id(2L)
+                .code("DEF67890")
+                .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.HIGH)
+                .pizzas(new ArrayList<>(List.of(testPizza)))
+                .createdAt(LocalDateTime.now().minusMinutes(5))
+                .updatedAt(LocalDateTime.now())
+                .build();
+        List<Order> queueOrders = List.of(testOrder, highPriorityOlder);
         when(orderRepository.findByStatusOrderByCreatedAtAsc(OrderStatus.RECEIVED))
                 .thenReturn(queueOrders);
         when(orderMapper.toDTO(testOrder)).thenReturn(testOrderDTO);
+        when(orderMapper.toDTO(highPriorityOlder)).thenReturn(
+                OrderDTO.builder()
+                        .id(2L)
+                        .code("DEF67890")
+                        .status(OrderStatus.RECEIVED)
+                        .priority(OrderPriority.HIGH)
+                        .build()
+        );
 
         // Act
         List<OrderDTO> result = orderService.getOrderQueue();
 
         // Assert
         assertNotNull(result);
-        assertEquals(1, result.size());
+        assertEquals(2, result.size());
+        assertEquals("DEF67890", result.get(0).getCode());
         verify(orderRepository, times(1)).findByStatusOrderByCreatedAtAsc(OrderStatus.RECEIVED);
     }
 
@@ -364,6 +390,45 @@ class OrderServiceTest {
         when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(OrderNotFoundException.class, () -> orderService.cancelOrder(999L));
+    }
+
+    @Test
+    void testUpdatePriority_ForReceivedOrder() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
+        Order updated = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.HIGH)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.save(any(Order.class))).thenReturn(updated);
+        when(orderMapper.toDTO(updated)).thenReturn(OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.RECEIVED)
+                .priority(OrderPriority.HIGH)
+                .build());
+
+        OrderDTO result = orderService.updatePriority(1L, OrderPriority.HIGH);
+
+        assertEquals(OrderPriority.HIGH, result.getPriority());
+        verify(orderRepository, times(1)).save(any(Order.class));
+    }
+
+    @Test
+    void testUpdatePriority_RejectsNonReceivedOrder() {
+        Order inProgress = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.IN_PROGRESS)
+                .priority(OrderPriority.NORMAL)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(inProgress));
+
+        assertThrows(InvalidOrderStateException.class, () -> orderService.updatePriority(1L, OrderPriority.HIGH));
+        verify(orderRepository, never()).save(any(Order.class));
     }
 }
 

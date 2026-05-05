@@ -1,12 +1,14 @@
 package it.adesso.awesomepizza.service;
 
+import it.adesso.awesomepizza.model.CreateOrderRequest;
 import it.adesso.awesomepizza.model.OrderDTO;
+import it.adesso.awesomepizza.model.OrderPriority;
 
 import java.util.List;
 
 public interface OrderServiceInterface {
 
-    OrderDTO createOrder(OrderDTO orderDTO);
+    OrderDTO createOrder(CreateOrderRequest request);
 
     OrderDTO getOrderByCode(String code);
 
@@ -23,4 +25,6 @@ public interface OrderServiceInterface {
     OrderDTO completeOrder(Long id);
 
     OrderDTO cancelOrder(Long id);
+
+    OrderDTO updatePriority(Long id, OrderPriority priority);
 }

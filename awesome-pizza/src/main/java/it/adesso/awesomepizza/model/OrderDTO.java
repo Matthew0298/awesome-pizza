@@ -1,8 +1,5 @@
 package it.adesso.awesomepizza.model;
 
-import it.adesso.awesomepizza.model.OrderStatus;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,8 +20,9 @@ public class OrderDTO {
 
     private OrderStatus status;
 
-    @Valid
-    @NotEmpty(message = "At least one pizza must be provided")
+    /** Set by persistence / admin endpoints; never supplied on creation (use {@link CreateOrderRequest}). */
+    private OrderPriority priority;
+
     private List<PizzaDTO> pizzas;
 
     private LocalDateTime createdAt;

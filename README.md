@@ -36,7 +36,7 @@ Il codice e organizzato in package applicativi semplici (layered):
 - `it.adesso.awesomepizza.repo`  
   Accesso ai dati tramite Spring Data JPA.
 - `it.adesso.awesomepizza.model`  
-  Entity JPA, DTO, enum di stato, error model.
+  Entity JPA, DTO (`OrderDTO` per risposte), `CreateOrderRequest` per `POST /orders`, enum, error model.
 - `it.adesso.awesomepizza.exception`  
   Eccezioni custom + gestione errori globale.
 - `it.adesso.awesomepizza.configuration`  
@@ -46,12 +46,16 @@ Il codice e organizzato in package applicativi semplici (layered):
 
 ## Modello Dati
 
-### Order
+### Order (risposte API: `OrderDTO`)
 - `id` (Long)
 - `code` (String, univoco, generato automaticamente)
 - `status` (`RECEIVED`, `IN_PROGRESS`, `READY`, `COMPLETED`, `CANCELLED`)
+- `priority` (`LOW`, `NORMAL`, `HIGH`; default `NORMAL` alla creazione; modifica solo tramite endpoint admin)
 - `pizzas` (lista di `Pizza`)
 - `createdAt`, `updatedAt`
+
+### Creazione ordine (body API: `CreateOrderRequest`)
+- solo `pizzas` (lista di `PizzaDTO`); nessun `status`, `code`, `priority` o altri campi gestiti dal server.
 
 ### Pizza
 - `id` (Long)
@@ -87,7 +91,7 @@ Base path: `http://localhost:8080/api/v1`
 - `GET /orders`  
   Lista completa ordini.
 - `GET /orders/queue/waiting`  
-  Coda ordini in stato `RECEIVED` (ordinati per data crescente).
+  Coda ordini in stato `RECEIVED` (ordinati per `priority` decrescente, poi `createdAt` crescente).
 - `PUT /orders/{id}/start`  
   Stato `RECEIVED -> IN_PROGRESS`.
 - `PUT /orders/{id}/ready`  
@@ -96,6 +100,8 @@ Base path: `http://localhost:8080/api/v1`
   Stato `READY -> COMPLETED`.
 - `PUT /orders/{id}/cancel`  
   Stato `RECEIVED` o `IN_PROGRESS -> CANCELLED` (non elimina la riga; aggiorna solo lo stato).
+- `PUT /orders/{id}/priority`  
+  Aggiorna la priorità (solo ordini `RECEIVED`; richiede header `X-User-Role: ADMIN`).
 
 ## Esempi Rapidi
 
