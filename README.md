@@ -21,6 +21,7 @@ Backend REST per la gestione ordini di una pizzeria, sviluppato con Spring Boot.
 - Polling stato ordine via API pubblica.
 - Gestione coda ordini lato pizzaiolo.
 - Avanzamento stato ordine lungo il flusso previsto.
+- Annullamento ordine in stati compatibili (vedi flusso sotto).
 
 ## Architettura Reale del Progetto
 
@@ -48,7 +49,7 @@ Il codice e organizzato in package applicativi semplici (layered):
 ### Order
 - `id` (Long)
 - `code` (String, univoco, generato automaticamente)
-- `status` (`RECEIVED`, `IN_PROGRESS`, `READY`, `COMPLETED`)
+- `status` (`RECEIVED`, `IN_PROGRESS`, `READY`, `COMPLETED`, `CANCELLED`)
 - `pizzas` (lista di `Pizza`)
 - `createdAt`, `updatedAt`
 
@@ -60,7 +61,15 @@ Il codice e organizzato in package applicativi semplici (layered):
 
 ## Flusso Stati Ordine
 
+Percorso operativo felice:
+
 `RECEIVED -> IN_PROGRESS -> READY -> COMPLETED`
+
+Annullamento (stato terminale, ordine resta in archivio per storico):
+
+- Da `RECEIVED` o `IN_PROGRESS` verso `CANCELLED` tramite `PUT /orders/{id}/cancel`.
+- Non consentito da `READY` o `COMPLETED` (risposta `409 Conflict`).
+- Ripetere `PUT .../cancel` su un ordine gia `CANCELLED` e idempotente: risposta `200` senza ulteriori modifiche.
 
 ## API
 
@@ -85,6 +94,8 @@ Base path: `http://localhost:8080/api/v1`
   Stato `IN_PROGRESS -> READY`.
 - `PUT /orders/{id}/complete`  
   Stato `READY -> COMPLETED`.
+- `PUT /orders/{id}/cancel`  
+  Stato `RECEIVED` o `IN_PROGRESS -> CANCELLED` (non elimina la riga; aggiorna solo lo stato).
 
 ## Esempi Rapidi
 
@@ -105,6 +116,12 @@ curl -X POST http://localhost:8080/api/v1/orders \
 
 ```bash
 curl http://localhost:8080/api/v1/orders/ABC12345
+```
+
+### Annulla ordine (id pizzaiolo: usa l'id numerico)
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/orders/1/cancel
 ```
 
 ## Configurazione
@@ -178,7 +195,7 @@ Il progetto applica:
 Test presenti in `awesome-pizza/src/test/java`:
 
 - `service/OrderServiceTest` (unit test service)
-- `controller/OrderControllerTest` (test controller con MockMvc)
+- `controller/OrderControllerTest` (test controller con MockMvc, incluso annullamento e errori HTTP)
 - test di bootstrap contesto Spring (`AwesomePizzaApplicationTests`, `AwesomePizzaApplicationIntegrationTests`)
 
 Esecuzione:
@@ -192,5 +209,5 @@ cd awesome-pizza
 
 - Nessuna autenticazione/registrazione utente (coerente con traccia iniziale).
 - Database in-memory (utile per iterazione 1 e sviluppo locale).
-- Non e ancora implementato uno stato di annullamento ordine.
+- Gli annullamenti usano lo stato `CANCELLED` (soft cancel), non `DELETE` sulla risorsa.
 - Il vincolo "un solo ordine IN_PROGRESS alla volta" non e ancora enforceato a livello di business.

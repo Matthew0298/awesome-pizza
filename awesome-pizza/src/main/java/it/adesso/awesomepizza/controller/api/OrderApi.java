@@ -41,4 +41,8 @@ public interface OrderApi {
     @PutMapping("/{id}/complete")
     @Operation(summary = "Complete order", description = "Moves order status from READY to COMPLETED")
     ResponseEntity<OrderDTO> completeOrder(@PathVariable Long id);
+
+    @PutMapping("/{id}/cancel")
+    @Operation(summary = "Cancel order", description = "Cancels the order when it is RECEIVED or IN_PROGRESS; idempotent when already CANCELLED")
+    ResponseEntity<OrderDTO> cancelOrder(@PathVariable Long id);
 }

@@ -3,6 +3,8 @@ package it.adesso.awesomepizza.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.adesso.awesomepizza.constant.ApiPaths;
 import it.adesso.awesomepizza.exception.GlobalExceptionHandler;
+import it.adesso.awesomepizza.exception.InvalidOrderStateException;
+import it.adesso.awesomepizza.exception.OrderNotFoundException;
 import it.adesso.awesomepizza.model.OrderDTO;
 import it.adesso.awesomepizza.model.OrderStatus;
 import it.adesso.awesomepizza.model.PizzaDTO;
@@ -19,6 +21,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,5 +72,40 @@ class OrderControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    void shouldCancelOrder() throws Exception {
+        OrderDTO response = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .build();
+
+        when(orderService.cancelOrder(1L)).thenReturn(response);
+
+        mockMvc.perform(put(ApiPaths.ORDERS + "/1/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ABC12345"))
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenCancelNotAllowed() throws Exception {
+        when(orderService.cancelOrder(1L)).thenThrow(
+                new InvalidOrderStateException("Order cannot be cancelled. Current status: READY"));
+
+        mockMvc.perform(put(ApiPaths.ORDERS + "/1/cancel"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Order cannot be cancelled. Current status: READY"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCancelUnknownOrder() throws Exception {
+        when(orderService.cancelOrder(999L)).thenThrow(new OrderNotFoundException("Order not found with id: 999"));
+
+        mockMvc.perform(put(ApiPaths.ORDERS + "/999/cancel"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Order not found with id: 999"));
     }
 }

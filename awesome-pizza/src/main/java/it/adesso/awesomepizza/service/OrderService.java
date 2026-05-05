@@ -201,6 +201,37 @@ public class OrderService implements OrderServiceInterface {
         return orderMapper.toDTO(updatedOrder);
     }
 
+    /**
+     * Cancel order (RECEIVED or IN_PROGRESS). Already CANCELLED is a no-op (idempotent).
+     */
+    @Override
+    public OrderDTO cancelOrder(Long id) {
+        OrderLogUtils.logBusinessEvent(log, "order.cancel.requested", id, null, null, "");
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Order not found with id: {}", id);
+                    return new OrderNotFoundException("Order not found with id: " + id);
+                });
+
+        if (order.getStatus().equals(OrderStatus.CANCELLED)) {
+            return orderMapper.toDTO(order);
+        }
+
+        if (!order.getStatus().equals(OrderStatus.RECEIVED)
+                && !order.getStatus().equals(OrderStatus.IN_PROGRESS)) {
+            log.warn("Cannot cancel order with id: {} - Current status: {}", id, order.getStatus());
+            throw new InvalidOrderStateException("Order cannot be cancelled. Current status: " + order.getStatus());
+        }
+
+        OrderStatus previousStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELLED);
+        Order updatedOrder = orderRepository.save(order);
+        OrderLogUtils.logStatusTransition(log, updatedOrder.getId(), updatedOrder.getCode(), previousStatus, updatedOrder.getStatus());
+
+        return orderMapper.toDTO(updatedOrder);
+    }
+
     private void validateOrderRequest(OrderDTO orderDTO) {
         ValidateUtils.requireNotNull(orderDTO, "Order payload cannot be null");
         ValidateUtils.requireNotNull(orderDTO.getPizzas(), "Order pizzas cannot be null");

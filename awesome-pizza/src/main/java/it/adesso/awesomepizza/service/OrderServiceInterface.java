@@ -21,4 +21,6 @@ public interface OrderServiceInterface {
     OrderDTO markAsReady(Long id);
 
     OrderDTO completeOrder(Long id);
+
+    OrderDTO cancelOrder(Long id);
 }

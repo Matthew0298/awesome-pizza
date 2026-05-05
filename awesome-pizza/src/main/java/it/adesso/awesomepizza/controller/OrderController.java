@@ -89,5 +89,15 @@ public class OrderController implements OrderApi {
         OrderDTO completedOrder = orderService.completeOrder(id);
         return ResponseEntity.ok(completedOrder);
     }
+
+    /**
+     * PUT /orders/{id}/cancel - Cancel order (RECEIVED or IN_PROGRESS)
+     */
+    @Override
+    public ResponseEntity<OrderDTO> cancelOrder(Long id) {
+        log.info("Request to cancel order with id: {}", id);
+        OrderDTO cancelledOrder = orderService.cancelOrder(id);
+        return ResponseEntity.ok(cancelledOrder);
+    }
 }
 

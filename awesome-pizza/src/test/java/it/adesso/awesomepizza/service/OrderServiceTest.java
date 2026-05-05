@@ -1,6 +1,7 @@
 package it.adesso.awesomepizza.service;
 
 import it.adesso.awesomepizza.configuration.AwesomePizzaProperties;
+import it.adesso.awesomepizza.exception.InvalidOrderStateException;
 import it.adesso.awesomepizza.exception.OrderNotFoundException;
 import it.adesso.awesomepizza.model.Order;
 import it.adesso.awesomepizza.model.OrderDTO;
@@ -268,6 +269,101 @@ class OrderServiceTest {
         assertThrows(OrderNotFoundException.class, () -> {
             orderService.completeOrder(999L);
         });
+    }
+
+    @Test
+    void testCancelOrder_FromReceived() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
+        Order cancelled = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.save(any(Order.class))).thenReturn(cancelled);
+        OrderDTO cancelledDto = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .build();
+        when(orderMapper.toDTO(cancelled)).thenReturn(cancelledDto);
+
+        OrderDTO result = orderService.cancelOrder(1L);
+
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(orderRepository, times(1)).save(any(Order.class));
+    }
+
+    @Test
+    void testCancelOrder_FromInProgress() {
+        Order inProgress = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.IN_PROGRESS)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(inProgress));
+        Order cancelled = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.save(any(Order.class))).thenReturn(cancelled);
+        OrderDTO cancelledDto = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .build();
+        when(orderMapper.toDTO(cancelled)).thenReturn(cancelledDto);
+
+        OrderDTO result = orderService.cancelOrder(1L);
+
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(orderRepository, times(1)).save(any(Order.class));
+    }
+
+    @Test
+    void testCancelOrder_IdempotentWhenAlreadyCancelled() {
+        Order cancelled = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(cancelled));
+        OrderDTO cancelledDto = OrderDTO.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.CANCELLED)
+                .build();
+        when(orderMapper.toDTO(cancelled)).thenReturn(cancelledDto);
+
+        OrderDTO result = orderService.cancelOrder(1L);
+
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void testCancelOrder_RejectedWhenReady() {
+        Order ready = Order.builder()
+                .id(1L)
+                .code("ABC12345")
+                .status(OrderStatus.READY)
+                .pizzas(testOrder.getPizzas())
+                .build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(ready));
+
+        assertThrows(InvalidOrderStateException.class, () -> orderService.cancelOrder(1L));
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void testCancelOrder_NotFound() {
+        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(OrderNotFoundException.class, () -> orderService.cancelOrder(999L));
     }
 }
 
